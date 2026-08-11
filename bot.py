@@ -1098,25 +1098,49 @@ async def set_product(message: Message):
 
 
 async def run_bot():
-    log.info("Starting Telegram bot...")
+    log.info("=" * 60)
+    log.info("🤖 TELEGRAM BOT STARTING")
+    log.info("=" * 60)
 
-    bot = Bot(settings.bot_token)
+    token = settings.bot_token
+
+    if not token:
+        log.error("❌ BOT_TOKEN is empty!")
+        raise RuntimeError(
+            "BOT_TOKEN environment variable is not set"
+        )
+
+    log.info(
+        "🔑 BOT_TOKEN loaded successfully (length=%d)",
+        len(token),
+    )
+
+    bot = Bot(token)
 
     try:
+        log.info("📡 Connecting to Telegram...")
+
         me = await bot.get_me()
 
-        log.info(
-            "Telegram connected: @%s",
-            me.username,
-        )
+        log.info("=" * 60)
+        log.info("✅ TELEGRAM CONNECTION SUCCESSFUL")
+        log.info("🤖 Bot ID: %s", me.id)
+        log.info("👤 Bot username: @%s", me.username)
+        log.info("📛 Bot name: %s", me.first_name)
+        log.info("=" * 60)
 
-        await dp.start_polling(bot)
+        log.info("📥 Starting polling...")
+
+        await dp.start_polling(
+            bot,
+            allowed_updates=dp.resolve_used_update_types(),
+        )
 
     except Exception:
-        log.exception(
-            "Telegram bot crashed"
-        )
+        log.exception("💥 TELEGRAM BOT CRASHED")
         raise
 
     finally:
+        log.info("🛑 Closing Telegram bot session...")
         await bot.session.close()
+        log.info("👋 Telegram bot stopped")
