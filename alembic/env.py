@@ -1,18 +1,13 @@
 import os
 import sys
 import asyncio
-from logging.config import fileConfig
 
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
 from alembic import context
 
 
-# ============================================================
-# Добавляем корень проекта в PYTHONPATH
-# ============================================================
-
+# Корень проекта (/app)
 PROJECT_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..")
 )
@@ -21,79 +16,18 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 
-# ============================================================
-# Импорты проекта
-# ============================================================
-
 from config import get_settings
 from models import Base
 
 
-# ============================================================
-# Alembic Config
-# ============================================================
-
 config = context.config
-
-
-# ============================================================
-# Logging
-# ============================================================
-
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
-
-# ============================================================
-# Settings
-# ============================================================
-
 settings = get_settings()
 
+target_metadata = Base.metadata
 DATABASE_URL = settings.database_url
 
 
-# ============================================================
-# Metadata
-# ============================================================
-
-target_metadata = Base.metadata
-
-
-# ============================================================
-# Offline migrations
-# ============================================================
-
-def run_migrations_offline() -> None:
-    """
-    Run migrations in 'offline' mode.
-
-    In this mode Alembic does not create a real database
-    connection. It generates SQL statements instead.
-    """
-
-    context.configure(
-        url=DATABASE_URL,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={
-            "paramstyle": "named"
-        },
-    )
-
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-# ============================================================
-# Online migrations
-# ============================================================
-
-def do_run_migrations(connection) -> None:
-    """
-    Configure Alembic using an active database connection.
-    """
-
+def do_run_migrations(connection):
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -104,26 +38,13 @@ def do_run_migrations(connection) -> None:
         context.run_migrations()
 
 
-async def run_async_migrations() -> None:
-    """
-    Create an async SQLAlchemy engine and run migrations.
-    """
-
-    # ВАЖНО:
-    # Не используем config.set_main_option() для DATABASE_URL.
-    #
-    # В пароле Supabase может быть %3F, %40 и другие URL-encoded
-    # символы. ConfigParser воспринимает % как interpolation.
-    #
-    # Поэтому URL передаём напрямую в словарь configuration.
-
+async def run_async_migrations():
     configuration = config.get_section(
         config.config_ini_section
-    )
+    ) or {}
 
-    if configuration is None:
-        configuration = {}
-
+    # Не используем set_main_option(), потому что
+    # ConfigParser ломается на %3F в пароле Supabase.
     configuration["sqlalchemy.url"] = DATABASE_URL
 
     connectable = async_engine_from_config(
@@ -140,19 +61,25 @@ async def run_async_migrations() -> None:
     await connectable.dispose()
 
 
-def run_migrations_online() -> None:
-    """
-    Run migrations in online mode.
-    """
+def run_migrations_offline():
+    context.configure(
+        url=DATABASE_URL,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={
+            "paramstyle": "named"
+        },
+    )
 
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online():
     asyncio.run(
         run_async_migrations()
     )
 
-
-# ============================================================
-# Entry point
-# ============================================================
 
 if context.is_offline_mode():
     run_migrations_offline()
